@@ -3,467 +3,399 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Cronômetro 40s</title>
+  <title>Cronômetro 46.6s</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0a0a;
+      --panel:     #111111;
+      --border:    #222222;
+      --neutral:   #e8e0d0;
+      --accent:    #ff4e00;
+      --green:     #00ff88;
+      --dim:       #444444;
+      --glow-red:  rgba(255,78,0,0.35);
+      --glow-grn:  rgba(0,255,136,0.35);
     }
 
     body {
+      background: var(--bg);
       min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #0f0f0f;
-      font-family: 'Segoe UI', sans-serif;
-      overflow: hidden;
-    }
-
-    .container {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 36px;
+      justify-content: center;
+      font-family: 'Share Tech Mono', monospace;
+      color: var(--neutral);
+      overflow: hidden;
+      position: relative;
     }
 
-    .title {
-      color: #888;
-      font-size: 14px;
-      letter-spacing: 4px;
+    /* scanline overlay */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(255,255,255,0.015) 3px,
+        rgba(255,255,255,0.015) 4px
+      );
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    /* noise grain */
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 99;
+      opacity: 0.5;
+    }
+
+    .wrapper {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+
+    /* top label bar */
+    .label-bar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 10px;
+      letter-spacing: 0.3em;
+      font-size: 0.72rem;
+      color: var(--dim);
       text-transform: uppercase;
     }
+    .label-bar span.dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      transition: background 0.4s;
+    }
+    .label-bar span.dot.green { background: var(--green); }
 
-    .ring-wrapper {
+    /* main panel */
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 52px 72px 44px;
       position: relative;
-      width: 280px;
-      height: 280px;
+      clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
     }
 
-    svg.ring {
-      width: 100%;
-      height: 100%;
-      transform: rotate(-90deg);
-    }
-
-    .ring-bg {
-      fill: none;
-      stroke: #1e1e1e;
-      stroke-width: 10;
-    }
-
-    .ring-progress {
-      fill: none;
-      stroke: #00e5ff;
-      stroke-width: 10;
-      stroke-linecap: round;
-      stroke-dasharray: 754;
-      stroke-dashoffset: 0;
-      transition: stroke 0.3s ease;
-      filter: drop-shadow(0 0 8px #00e5ff88);
-    }
-
-    .ring-progress.alert {
-      stroke: #ff4444;
-      filter: drop-shadow(0 0 12px #ff444499);
-    }
-
-    .center-display {
+    .panel::before {
+      content: '';
       position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-    }
-
-    .time-text {
-      font-size: 72px;
-      font-weight: 700;
-      color: #ffffff;
-      letter-spacing: -2px;
-      line-height: 1;
-      transition: color 0.3s;
-    }
-
-    .time-text.alert {
-      color: #ff4444;
-    }
-
-    .label-text {
-      font-size: 12px;
-      color: #555;
-      letter-spacing: 3px;
-      margin-top: 6px;
-    }
-
-    .sound-indicator {
-      position: absolute;
-      bottom: -32px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      gap: 5px;
-      align-items: flex-end;
-      height: 20px;
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-
-    .sound-indicator.active {
-      opacity: 1;
-    }
-
-    .bar {
-      width: 4px;
-      background: #ff4444;
-      border-radius: 2px;
-      animation: bounce 0.4s ease infinite alternate;
-    }
-
-    .bar:nth-child(1) { height: 8px;  animation-delay: 0s; }
-    .bar:nth-child(2) { height: 16px; animation-delay: 0.1s; }
-    .bar:nth-child(3) { height: 20px; animation-delay: 0.05s; }
-    .bar:nth-child(4) { height: 14px; animation-delay: 0.15s; }
-    .bar:nth-child(5) { height: 10px; animation-delay: 0.08s; }
-
-    @keyframes bounce {
-      from { transform: scaleY(0.4); }
-      to   { transform: scaleY(1); }
-    }
-
-    /* Aviso de voz */
-    .voice-toast {
-      position: fixed;
-      top: 24px;
-      left: 50%;
-      transform: translateX(-50%) translateY(-80px);
-      background: #1a1a1a;
-      border: 1px solid #00e5ff33;
-      color: #00e5ff;
-      padding: 10px 24px;
-      border-radius: 50px;
-      font-size: 13px;
-      letter-spacing: 1px;
-      transition: transform 0.35s cubic-bezier(.4,2,.6,1), opacity 0.35s;
-      opacity: 0;
-      white-space: nowrap;
+      inset: 0;
+      clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+      background: linear-gradient(135deg, rgba(255,78,0,0.04) 0%, transparent 60%);
       pointer-events: none;
+      transition: background 0.5s;
+    }
+    .panel.green-mode::before {
+      background: linear-gradient(135deg, rgba(0,255,136,0.06) 0%, transparent 60%);
     }
 
-    .voice-toast.show {
-      transform: translateX(-50%) translateY(0);
-      opacity: 1;
+    /* corner brackets */
+    .corner {
+      position: absolute;
+      width: 16px; height: 16px;
+      border-color: var(--accent);
+      border-style: solid;
+      transition: border-color 0.4s;
+    }
+    .corner.tl { top: 6px;  left: 6px;  border-width: 2px 0 0 2px; }
+    .corner.tr { top: 6px;  right: 6px; border-width: 2px 2px 0 0; }
+    .corner.bl { bottom: 6px; left: 6px; border-width: 0 0 2px 2px; }
+    .corner.br { bottom: 6px; right: 6px; border-width: 0 2px 2px 0; }
+    .panel.green-mode .corner { border-color: var(--green); }
+
+    /* time display */
+    .time-display {
+      font-family: 'Bebas Neue', cursive;
+      font-size: clamp(100px, 22vw, 200px);
+      line-height: 0.9;
+      letter-spacing: 0.04em;
+      color: var(--accent);
+      text-shadow:
+        0 0 40px var(--glow-red),
+        0 0 80px rgba(255,78,0,0.15);
+      transition: color 0.4s, text-shadow 0.4s;
+      user-select: none;
+      position: relative;
     }
 
-    /* Controles */
-    .controls {
+    .time-display.green {
+      color: var(--green);
+      text-shadow:
+        0 0 40px var(--glow-grn),
+        0 0 80px rgba(0,255,136,0.15);
+    }
+
+    /* milliseconds sub-display */
+    .ms-display {
+      font-family: 'Bebas Neue', cursive;
+      font-size: clamp(36px, 7vw, 68px);
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      opacity: 0.7;
+      text-align: right;
+      margin-top: -8px;
+      transition: color 0.4s;
+    }
+    .ms-display.green { color: var(--green); }
+
+    /* progress bar */
+    .progress-wrap {
+      width: 100%;
+      height: 4px;
+      background: #1e1e1e;
+      margin-top: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--glow-red);
+      transition: background 0.4s, box-shadow 0.4s;
+    }
+    .progress-fill.green {
+      background: var(--green);
+      box-shadow: 0 0 10px var(--glow-grn);
+    }
+
+    /* lap markers on progress bar */
+    .marker-32 {
+      position: absolute;
+      top: -3px;
+      left: calc(32 / 46.6 * 100%);
+      width: 2px;
+      height: 10px;
+      background: var(--neutral);
+      opacity: 0.4;
+    }
+
+    /* status row */
+    .status-row {
       display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      justify-content: center;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 14px;
+      font-size: 0.68rem;
+      letter-spacing: 0.2em;
+      color: var(--dim);
+      text-transform: uppercase;
     }
+    .status-row .lap-count { color: var(--neutral); opacity: 0.5; }
 
-    button {
-      padding: 12px 28px;
-      border: none;
-      border-radius: 50px;
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: 1px;
-      cursor: pointer;
-      transition: all 0.2s;
+    /* start button */
+    .btn-wrap {
+      margin-top: 40px;
     }
 
     .btn-start {
-      background: #00e5ff;
-      color: #000;
-    }
-
-    .btn-start:hover {
-      background: #00cfea;
-      box-shadow: 0 0 20px #00e5ff55;
-    }
-
-    .btn-reset {
       background: transparent;
-      color: #555;
-      border: 1px solid #2a2a2a;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: 'Bebas Neue', cursive;
+      font-size: 1.4rem;
+      letter-spacing: 0.3em;
+      padding: 14px 52px;
+      cursor: pointer;
+      clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+      position: relative;
+      overflow: hidden;
+      transition: color 0.3s, border-color 0.3s, background 0.3s;
     }
 
-    .btn-reset:hover {
-      border-color: #555;
-      color: #aaa;
+    .btn-start::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--accent);
+      opacity: 0;
+      transition: opacity 0.25s;
     }
+    .btn-start:hover::before { opacity: 0.12; }
+    .btn-start:active::before { opacity: 0.25; }
 
-    /* Botão Loop */
-    .btn-loop {
-      background: transparent;
-      color: #555;
-      border: 1px solid #2a2a2a;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    .btn-start span { position: relative; z-index: 1; }
+
+    .btn-start.running {
+      border-color: var(--dim);
+      color: var(--dim);
+      cursor: default;
     }
+    .btn-start.running::before { display: none; }
 
-    .btn-loop:hover {
-      border-color: #555;
-      color: #aaa;
+    /* cycle flash overlay */
+    @keyframes flashCycle {
+      0%   { opacity: 0.18; }
+      100% { opacity: 0; }
     }
-
-    .btn-loop.on {
-      background: #1a2e1a;
-      color: #44ff88;
-      border-color: #44ff8855;
-      box-shadow: 0 0 12px #44ff8822;
+    .flash-overlay {
+      position: fixed; inset: 0;
+      background: var(--green);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 90;
     }
+    .flash-overlay.flash { animation: flashCycle 0.35s ease-out forwards; }
 
-    .loop-icon {
-      font-size: 15px;
-      line-height: 1;
+    /* pulse ring on time */
+    @keyframes pulseRing {
+      0%   { transform: scale(1);   opacity: 0.6; }
+      100% { transform: scale(1.06); opacity: 0; }
     }
-
-    /* Info de loop */
-    .loop-info {
-      font-size: 11px;
-      color: #333;
-      letter-spacing: 2px;
-      height: 14px;
-      transition: color 0.3s;
+    .time-display.pulse-anim::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border: 2px solid currentColor;
+      animation: pulseRing 0.5s ease-out;
     }
-
-    .loop-info.on {
-      color: #44ff8866;
-    }
-
-    .status {
-      font-size: 13px;
-      color: #444;
-      letter-spacing: 2px;
-      height: 18px;
-      transition: color 0.3s;
-    }
-
-    .status.active { color: #00e5ff; }
-    .status.alert  { color: #ff4444; }
-    .status.loop   { color: #44ff88; }
   </style>
 </head>
 <body>
 
-<div class="voice-toast" id="voiceToast">🔊 —</div>
+<div class="flash-overlay" id="flashOverlay"></div>
 
-<div class="container">
-  <span class="title">Cronômetro</span>
+<div class="wrapper">
+  <div class="label-bar">
+    <span>CRONÔMETRO</span>
+    <span class="dot" id="statusDot"></span>
+    <span id="statusLabel">AGUARDANDO</span>
+  </div>
 
-  <div class="ring-wrapper">
-    <svg class="ring" viewBox="0 0 260 260">
-      <circle class="ring-bg" cx="130" cy="130" r="120"/>
-      <circle class="ring-progress" id="ringProgress" cx="130" cy="130" r="120"/>
-    </svg>
+  <div class="panel" id="panel">
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
 
-    <div class="center-display">
-      <div class="time-text" id="timeDisplay">40</div>
-      <div class="label-text">SEGUNDOS</div>
+    <div class="time-display" id="timeDisplay">00</div>
+    <div class="ms-display"   id="msDisplay">.0</div>
+
+    <div class="progress-wrap">
+      <div class="progress-fill" id="progressFill"></div>
+      <div class="marker-32"></div>
     </div>
 
-    <div class="sound-indicator" id="soundIndicator">
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
+    <div class="status-row">
+      <span id="cycleLabel">CICLO&nbsp;—</span>
+      <span class="lap-count" id="lapCount">0 CICLOS</span>
     </div>
   </div>
 
-  <div class="controls">
-    <button class="btn-start" id="btnStart" onclick="toggleTimer()">INICIAR</button>
-    <button class="btn-reset" onclick="resetTimer()">RESETAR</button>
-    <button class="btn-loop" id="btnLoop" onclick="toggleLoop()">
-      <span class="loop-icon">↻</span> LOOP
+  <div class="btn-wrap">
+    <button class="btn-start" id="btnStart" onclick="startTimer()">
+      <span>▶ INICIAR</span>
     </button>
   </div>
-
-  <span class="loop-info" id="loopInfo">LOOP DESATIVADO</span>
-  <span class="status" id="status">AGUARDANDO</span>
 </div>
 
 <script>
-  const TOTAL          = 40;
-  const ALERT_DURATION = 6;
-  const CIRCUMFERENCE  = 2 * Math.PI * 120;
+  const TOTAL = 46.6;          // seconds per cycle
+  const GREEN_AT = 32;         // seconds — turn green
 
-  // Anunciar a cada múltiplo de 10s (exceto 0, que é o alarme)
-  const ANNOUNCE_AT = [30, 20, 10];
+  let startTime   = null;
+  let elapsed     = 0;
+  let cycleStart  = null;
+  let cycleCount  = 0;
+  let rafId       = null;
+  let running     = false;
 
-  let remaining    = TOTAL;
-  let running      = false;
-  let loopEnabled  = false;
-  let interval     = null;
-  let audioCtx     = null;
-  let alarmNodes   = [];
-  let alarmTimeout = null;
-  let toastTimeout = null;
+  const timeDisplay  = document.getElementById('timeDisplay');
+  const msDisplay    = document.getElementById('msDisplay');
+  const progressFill = document.getElementById('progressFill');
+  const statusDot    = document.getElementById('statusDot');
+  const statusLabel  = document.getElementById('statusLabel');
+  const lapCount     = document.getElementById('lapCount');
+  const cycleLabel   = document.getElementById('cycleLabel');
+  const panel        = document.getElementById('panel');
+  const btnStart     = document.getElementById('btnStart');
+  const flashOverlay = document.getElementById('flashOverlay');
 
-  const ringProgress   = document.getElementById('ringProgress');
-  const timeDisplay    = document.getElementById('timeDisplay');
-  const btnStart       = document.getElementById('btnStart');
-  const btnLoop        = document.getElementById('btnLoop');
-  const status         = document.getElementById('status');
-  const loopInfo       = document.getElementById('loopInfo');
-  const soundIndicator = document.getElementById('soundIndicator');
-  const voiceToast     = document.getElementById('voiceToast');
-
-  ringProgress.style.strokeDasharray = CIRCUMFERENCE;
-  updateRing(TOTAL);
-
-  // ── Web Speech API ──────────────────────────────────────────────
-  function speak(text) {
-    if (!('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang  = 'pt-BR';
-    utter.rate  = 1.1;
-    utter.pitch = 1;
-    window.speechSynthesis.speak(utter);
-    showToast('🔊 ' + text);
-  }
-
-  function showToast(msg) {
-    voiceToast.textContent = msg;
-    voiceToast.classList.add('show');
-    clearTimeout(toastTimeout);
-    toastTimeout = setTimeout(() => voiceToast.classList.remove('show'), 2800);
-  }
-
-  // ── Áudio de alarme ─────────────────────────────────────────────
-  function getAudioContext() {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    return audioCtx;
-  }
-
-  function playAlarm() {
-    const ctx = getAudioContext();
-    alarmNodes = [];
-
-    function beepCycle(startTime) {
-      const osc  = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(880, startTime);
-      osc.frequency.setValueAtTime(660, startTime + 0.15);
-      gain.gain.setValueAtTime(0.3, startTime);
-      gain.gain.setValueAtTime(0, startTime + 0.3);
-      osc.start(startTime);
-      osc.stop(startTime + 0.3);
-      alarmNodes.push(osc);
+  function setGreen(on) {
+    if (on) {
+      timeDisplay.classList.add('green');
+      msDisplay.classList.add('green');
+      progressFill.classList.add('green');
+      panel.classList.add('green-mode');
+      statusDot.classList.add('green');
+    } else {
+      timeDisplay.classList.remove('green');
+      msDisplay.classList.remove('green');
+      progressFill.classList.remove('green');
+      panel.classList.remove('green-mode');
+      statusDot.classList.remove('green');
     }
-
-    const now = ctx.currentTime;
-    for (let i = 0; i < 10; i++) beepCycle(now + i * 0.6);
   }
 
-  function stopAlarm() {
-    alarmNodes.forEach(n => { try { n.stop(); } catch(e) {} });
-    alarmNodes = [];
-    if (alarmTimeout) { clearTimeout(alarmTimeout); alarmTimeout = null; }
-  }
-
-  // ── Anel de progresso ───────────────────────────────────────────
-  function updateRing(secs) {
-    const offset = CIRCUMFERENCE * (1 - secs / TOTAL);
-    ringProgress.style.strokeDashoffset = offset;
-  }
-
-  function setAlertMode(on) {
-    ringProgress.classList.toggle('alert', on);
-    timeDisplay.classList.toggle('alert', on);
-    soundIndicator.classList.toggle('active', on);
-  }
-
-  // ── Loop ────────────────────────────────────────────────────────
-  function toggleLoop() {
-    loopEnabled = !loopEnabled;
-    btnLoop.classList.toggle('on', loopEnabled);
-    loopInfo.textContent = loopEnabled ? 'LOOP ATIVADO' : 'LOOP DESATIVADO';
-    loopInfo.classList.toggle('on', loopEnabled);
-  }
-
-  // ── Timer ───────────────────────────────────────────────────────
-  function toggleTimer() {
-    running ? pauseTimer() : startTimer();
+  function flash() {
+    flashOverlay.classList.remove('flash');
+    void flashOverlay.offsetWidth; // reflow
+    flashOverlay.classList.add('flash');
   }
 
   function startTimer() {
-    running = true;
-    btnStart.textContent = 'PAUSAR';
-    status.textContent   = 'EM EXECUÇÃO';
-    status.className     = 'status active';
+    if (running) return;
+    running    = true;
+    cycleStart = performance.now();
+    cycleCount = 0;
 
-    interval = setInterval(() => {
-      remaining--;
-      timeDisplay.textContent = remaining;
-      updateRing(remaining);
+    btnStart.classList.add('running');
+    btnStart.querySelector('span').textContent = '● EM EXECUÇÃO';
+    statusLabel.textContent = 'RODANDO';
 
-      // Anúncio de voz a cada 10s
-      if (ANNOUNCE_AT.includes(remaining)) {
-        const falta = remaining; // segundos restantes no cronômetro
-        speak(`Faltam ${falta} segundos`);
-      }
-
-      if (remaining === 0) {
-        clearInterval(interval);
-        running = false;
-        btnStart.textContent = 'INICIAR';
-        status.textContent   = 'ALARME';
-        status.className     = 'status alert';
-        setAlertMode(true);
-        playAlarm();
-        speak('Tempo esgotado!');
-
-        alarmTimeout = setTimeout(() => {
-          stopAlarm();
-          if (loopEnabled) {
-            // reinicia automaticamente
-            remaining = TOTAL;
-            timeDisplay.textContent = TOTAL;
-            updateRing(TOTAL);
-            setAlertMode(false);
-            status.textContent = 'EM EXECUÇÃO';
-            status.className   = 'status active';
-            startTimer();
-          } else {
-            resetTimer();
-          }
-        }, ALERT_DURATION * 1000);
-      }
-    }, 1000);
+    rafId = requestAnimationFrame(tick);
   }
 
-  function pauseTimer() {
-    clearInterval(interval);
-    running = false;
-    btnStart.textContent = 'RETOMAR';
-    status.textContent   = 'PAUSADO';
-    status.className     = 'status';
-  }
+  function tick(now) {
+    const cycleElapsed = (now - cycleStart) / 1000; // seconds
 
-  function resetTimer() {
-    clearInterval(interval);
-    stopAlarm();
-    window.speechSynthesis && window.speechSynthesis.cancel();
-    running   = false;
-    remaining = TOTAL;
-    timeDisplay.textContent = TOTAL;
-    updateRing(TOTAL);
-    setAlertMode(false);
-    btnStart.textContent = 'INICIAR';
-    status.textContent   = 'AGUARDANDO';
-    status.className     = 'status';
+    // check if cycle finished
+    if (cycleElapsed >= TOTAL) {
+      cycleCount++;
+      cycleStart += TOTAL * 1000; // keep perfect timing — no drift
+      flash();
+      setGreen(false);
+    }
+
+    const t   = ((now - cycleStart) / 1000);
+    const sec = Math.floor(t);
+    const dec = Math.floor((t % 1) * 10);
+
+    // update display
+    timeDisplay.textContent = String(sec).padStart(2, '0');
+    msDisplay.textContent   = '.' + dec;
+
+    // progress bar
+    const pct = Math.min(t / TOTAL * 100, 100);
+    progressFill.style.width = pct + '%';
+
+    // green threshold
+    setGreen(t >= GREEN_AT);
+
+    // cycle count label
+    lapCount.textContent  = cycleCount + (cycleCount === 1 ? ' CICLO' : ' CICLOS');
+    cycleLabel.textContent = 'CICLO ' + (cycleCount + 1);
+
+    rafId = requestAnimationFrame(tick);
   }
 </script>
-
 </body>
 </html>
